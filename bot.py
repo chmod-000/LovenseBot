@@ -12,7 +12,7 @@ from discord_slash.utils.manage_commands import create_option
 try:
     GUILD_IDS = [int(x) for x in os.getenv('GUILD_IDS').split(',')]
 except ValueError:
-    GUILD_IDS = []
+    GUILD_IDS = None
 
 LOVENSE_DEVELOPER_TOKEN = os.getenv('LOVENSE_DEVELOPER_TOKEN')
 TOKEN = os.getenv('TOKEN')
@@ -28,7 +28,7 @@ slash = SlashCommand(bot, sync_commands=True)
 
 
 @slash.subcommand(base='lovense', name="connect",
-                  description="Connect a toy")
+                  description="Connect a toy", guild_ids=GUILD_IDS)
 async def connect(ctx: SlashContext):
     url = controller.get_connection_qr(str(ctx.guild_id), str(ctx.author_id))
     if url is None:
@@ -42,7 +42,7 @@ async def connect(ctx: SlashContext):
 
 
 @slash.subcommand(base='lovense', name="status",
-                  description="List connected toys")
+                  description="List connected toys", guild_ids=GUILD_IDS)
 async def status(ctx: SlashContext):
     embed = Embed(title='Connected Toys')
     toy_count = {}
@@ -100,7 +100,7 @@ async def vibrate_pattern(ctx: SlashContext, pattern):
 
 
 @slash.subcommand(base='lovense', name="stop",
-                  description="Stop all toys")
+                  description="Stop all toys", guild_ids=GUILD_IDS)
 async def stop(ctx: SlashContext):
     if controller.stop(str(ctx.guild_id)):
         await ctx.send("Break-time!", hidden=True)
