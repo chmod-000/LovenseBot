@@ -140,6 +140,7 @@ class ToyController:
         self._save()
 
     def get_toys(self):
+        self._refresh()
         toys = []
         for uid, user in self.users.items():
             toys += [y.get('name') for x, y in user.get('toys').items()]
