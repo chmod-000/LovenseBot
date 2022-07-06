@@ -81,7 +81,7 @@ async def vibrate(ctx: SlashContext, strength=10, duration=10):
 
 
 @slash.subcommand(base='lovense', name="pattern",
-                  description="Send a pattern to all toys",
+                  description="Send a pattern to all toys. This will loop until stopped, or replaced with another vibration or pattern",
                   guild_ids=GUILD_IDS,
                   options=[
                       create_option(
