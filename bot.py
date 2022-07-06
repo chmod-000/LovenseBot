@@ -92,7 +92,7 @@ async def vibrate(ctx: SlashContext, strength=10, duration=10):
                           required=True
                       )
                   ])
-async def vibrate(ctx: SlashContext, pattern):
+async def vibrate_pattern(ctx: SlashContext, pattern):
     if controller.pattern(pattern):
         await ctx.send("Here comes the {}!".format(pattern), hidden=True)
     else:
