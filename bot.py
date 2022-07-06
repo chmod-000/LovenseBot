@@ -24,7 +24,7 @@ API_URL_COMMAND = 'https://api.lovense.com/api/lan/v2/command'
 CALLBACK_PORT = 8000
 
 bot = Client(intents=Intents.default())
-slash = SlashCommand(bot, sync_commands=True)
+slash = SlashCommand(bot, sync_commands=True, debug_guild=os.getenv('DEBUG_GUILD_ID', None))
 
 
 @slash.subcommand(base='lovense', name="connect",
