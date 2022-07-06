@@ -30,7 +30,7 @@ slash = SlashCommand(bot, sync_commands=True)
 @slash.subcommand(base='lovense', name="connect",
                   description="Connect a toy")
 async def connect(ctx: SlashContext):
-    url = controller.get_connection_qr(ctx.author_id)
+    url = controller.get_connection_qr(str(ctx.guild_id), str(ctx.author_id))
     if url is None:
         await ctx.send("Sorry, I can't connect to Lovense right now", hidden=True)
         return
@@ -46,7 +46,7 @@ async def connect(ctx: SlashContext):
 async def status(ctx: SlashContext):
     embed = Embed(title='Connected Toys')
     toy_count = {}
-    for toy in controller.get_toys():
+    for toy in controller.get_toys(str(ctx.guild_id)):
         toy_count[toy] = toy_count+1 if toy in toy_count else 1
     if not toy_count:
         await ctx.send("There are no toys connected")
@@ -74,7 +74,7 @@ async def status(ctx: SlashContext):
                       ),
                   ])
 async def vibrate(ctx: SlashContext, strength=10, duration=10):
-    if controller.vibrate(duration=duration, strength=strength):
+    if controller.vibrate(str(ctx.guild_id), duration=duration, strength=strength):
         await ctx.send("Buzz buzz!", hidden=True)
     else:
         await ctx.send("There aren't any toys connected", hidden=True)
@@ -93,7 +93,7 @@ async def vibrate(ctx: SlashContext, strength=10, duration=10):
                       )
                   ])
 async def vibrate_pattern(ctx: SlashContext, pattern):
-    if controller.pattern(pattern):
+    if controller.pattern(str(ctx.guild_id), pattern):
         await ctx.send("Here comes the {}!".format(pattern), hidden=True)
     else:
         await ctx.send("There aren't any toys connected", hidden=True)
@@ -102,7 +102,7 @@ async def vibrate_pattern(ctx: SlashContext, pattern):
 @slash.subcommand(base='lovense', name="stop",
                   description="Stop all toys")
 async def stop(ctx: SlashContext):
-    if controller.stop():
+    if controller.stop(str(ctx.guild_id)):
         await ctx.send("Break-time!", hidden=True)
     else:
         await ctx.send("There aren't any toys connected", hidden=True)
@@ -113,18 +113,18 @@ class ToyController:
             'token': LOVENSE_DEVELOPER_TOKEN,
             'apiVer': '1'
         }
-    users = {}
+    guilds = {}
 
     def __init__(self):
         try:
-            with open('users.json', 'r') as f:
-                self.users = json.loads(f.read())
+            with open('guilds.json', 'r') as f:
+                self.guilds = json.loads(f.read())
         except (FileNotFoundError, IOError, json.decoder.JSONDecodeError):
-            self.users = {}
+            self.guilds = {}
 
-    def get_connection_qr(self, uid):
+    def get_connection_qr(self, guild_id: str, uid: str):
         req = {**self.BASE_REQ, **{
-            'uid': uid,
+            'uid': guild_id+':'+uid,
         }}
         try:
             with requests.post(API_URL_QR, req) as response:
@@ -132,26 +132,31 @@ class ToyController:
         except (json.JSONDecodeError, AttributeError):
             return None
 
-    def add_user(self, uid, user):
-        if uid not in self.users:
-            print("Added new user with UID {}".format(uid))
+    def add_user(self, guild_id: str, uid: str, user):
+        if guild_id not in self.guilds:
+            print("Adding new guild with GID {}".format(guild_id))
+            self.guilds[guild_id] = {}
+        if uid not in self.guilds.get(guild_id):
+            print("Added new user with GID:UID {}:{}".format(guild_id, uid))
         user['last_updated'] = round(time.time())
-        self.users[str(uid)] = user
+        self.guilds[guild_id][uid] = user
         self._save()
 
-    def get_toys(self):
+    def get_toys(self, guild_id: str):
         self._refresh()
         toys = []
-        for uid, user in self.users.items():
+        if guild_id not in self.guilds:
+            return []
+        for uid, user in self.guilds.get(guild_id).items():
             toys += [y.get('name') for x, y in user.get('toys').items()]
         return toys
 
-    def stop(self):
+    def stop(self, guild_id: str):
         self._refresh()
-        if not self.users:
+        if self.guilds.get(guild_id) is None:
             return False
         req = {**self.BASE_REQ, **{
-            'uid': ','.join(self.users.keys()),
+            'uid': ','.join(self.guilds.get(guild_id).keys()),
             'command': 'Function',
             'action': 'Stop',
             'timeSec': '0'
@@ -159,14 +164,14 @@ class ToyController:
         with requests.post(API_URL_COMMAND, json=req, timeout=5) as response:
             return response.status_code == 200
 
-    def pattern(self, pattern, uid: str = None):
+    def pattern(self, guild_id: str, pattern, uid: str = None):
         self._refresh()
-        if not self.users:
+        if self.guilds.get(guild_id) is None:
             return False
-        if uid is not None and uid not in self.users:
+        if uid is not None and uid not in self.guilds.get(guild_id):
             return False
         req = {**self.BASE_REQ, **{
-            'uid': ','.join(self.users.keys() if uid is None else [uid]),
+            'uid': ','.join(self.guilds.get(guild_id).keys() if uid is None else [guild_id + ':' + uid]),
             'command': 'Preset',
             'name': pattern,
             'timeSec': 0,
@@ -174,14 +179,14 @@ class ToyController:
         with requests.post(API_URL_COMMAND, json=req, timeout=5) as response:
             return response.status_code == 200
 
-    def vibrate(self, uid: str = None, strength: int = 10, duration: int = 10):
+    def vibrate(self, guild_id: str, uid: str = None, strength: int = 10, duration: int = 10):
         self._refresh()
-        if not self.users:
+        if guild_id not in self.guilds:
             return False
-        if uid is not None and uid not in self.users:
+        if uid is not None and uid not in self.guilds.get(guild_id):
             return False
         req = {**self.BASE_REQ, **{
-            'uid': ','.join(self.users.keys() if uid is None else [uid]),
+            'uid': ','.join(self.guilds.get(guild_id).keys() if uid is None else [guild_id + ':' + uid]),
             'command': 'Function',
             'action': 'Vibrate:{}'.format(strength),
             'timeSec': duration,
@@ -191,15 +196,16 @@ class ToyController:
 
     def _refresh(self):
         now = round(time.time())
-        old = self.users
-        self.users = {k: v for k, v in self.users.items() if v.get('last_updated') >= now-60}
-        if self.users != old:
+        old = {**self.guilds}
+        for guild_id, users in self.guilds.items():
+            self.guilds[guild_id] = {k: v for k, v in users.items() if v.get('last_updated') >= now - 60}
+        if self.guilds != old:
             self._save()
 
     def _save(self):
         try:
-            with open('users.json', 'w') as f:
-                f.write(json.dumps(self.users))
+            with open('guilds.json', 'w') as f:
+                f.write(json.dumps(self.guilds))
             return True
         except IOError:
             return False
@@ -215,7 +221,8 @@ class Callbacks:
         async def handler(request: web.Request):
             if request.body_exists and request.can_read_body:
                 body = await request.json()
-                self.controller.add_user(body.get('uid'), body)
+                pieces = body.get('uid').split(':')
+                self.controller.add_user(pieces[0], pieces[1], body)
             return web.Response(body=json.dumps({'status': 'OK'}))
 
         app = web.Application()
