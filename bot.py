@@ -80,6 +80,54 @@ async def vibrate(ctx: SlashContext, strength=10, duration=10):
         await ctx.send("There aren't any toys connected", hidden=True)
 
 
+@slash.subcommand(base='lovense', name="rotate",
+                  description="Rotate all toys",
+                  guild_ids=GUILD_IDS,
+                  options=[
+                      create_option(
+                          name="strength",
+                          description="Rotation strength (1-20). Defaults to 10",
+                          option_type=SlashCommandOptionType.INTEGER,
+                          required=False
+                      ),
+                      create_option(
+                          name="duration",
+                          description="Number of seconds it lasts. Defaults to 10 secconds",
+                          option_type=SlashCommandOptionType.INTEGER,
+                          required=False
+                      ),
+                  ])
+async def rotate(ctx: SlashContext, strength=10, duration=10):
+    if controller.rotate(str(ctx.guild_id), duration=duration, strength=strength):
+        await ctx.send("You spin me right round baby...", hidden=True)
+    else:
+        await ctx.send("There aren't any toys connected", hidden=True)
+
+
+@slash.subcommand(base='lovense', name="pump",
+                  description="Pump all toys",
+                  guild_ids=GUILD_IDS,
+                  options=[
+                      create_option(
+                          name="strength",
+                          description="Pump strength (1-3). Defaults to 2",
+                          option_type=SlashCommandOptionType.INTEGER,
+                          required=False
+                      ),
+                      create_option(
+                          name="duration",
+                          description="Number of seconds it lasts. Defaults to 10 secconds",
+                          option_type=SlashCommandOptionType.INTEGER,
+                          required=False
+                      ),
+                  ])
+async def rotate(ctx: SlashContext, strength=2, duration=10):
+    if controller.pump(str(ctx.guild_id), duration=duration, strength=strength):
+        await ctx.send("Let's get pumped!", hidden=True)
+    else:
+        await ctx.send("There aren't any toys connected", hidden=True)
+
+
 @slash.subcommand(base='lovense', name="pattern",
                   description="Send a pattern to all toys. Loops until stopped, or replaced with another vibration or pattern",
                   guild_ids=GUILD_IDS,
@@ -152,17 +200,7 @@ class ToyController:
         return toys
 
     def stop(self, guild_id: str):
-        self._refresh()
-        if self.guilds.get(guild_id) is None:
-            return False
-        req = {**self.BASE_REQ, **{
-            'uid': ','.join(self.guilds.get(guild_id).keys()),
-            'command': 'Function',
-            'action': 'Stop',
-            'timeSec': '0'
-        }}
-        with requests.post(API_URL_COMMAND, json=req, timeout=5) as response:
-            return response.status_code == 200
+        return self._function(guild_id, 'Stop', None, 0, 0)
 
     def pattern(self, guild_id: str, pattern, uid: str = None):
         self._refresh()
@@ -180,15 +218,28 @@ class ToyController:
             return response.status_code == 200
 
     def vibrate(self, guild_id: str, uid: str = None, strength: int = 10, duration: int = 10):
+        return self._function(guild_id, 'Vibrate', uid, strength, duration)
+
+    def rotate(self, guild_id: str, uid: str = None, strength: int = 10, duration: int = 10):
+        return self._function(guild_id, 'Rotate', uid, strength, duration)
+
+    def pump(self, guild_id: str, uid: str = None, strength: int = 10, duration: int = 10):
+        return self._function(guild_id, 'Pump', uid, strength, duration)
+
+    # Send a command=Function request
+    def _function(self, guild_id: str, action: str, uid: str = None, strength: int = 10, duration: int = 10):
         self._refresh()
         if guild_id not in self.guilds:
             return False
         if uid is not None and uid not in self.guilds.get(guild_id):
             return False
+        if strength > 0:
+            action += ':{}'.format(strength)
+        uids = ['{}:{}'.format(guild_id, x) for x in (self.guilds.get(guild_id).keys() if uid is None else [uid])]
         req = {**self.BASE_REQ, **{
-            'uid': ','.join(self.guilds.get(guild_id).keys() if uid is None else [guild_id + ':' + uid]),
+            'uid': ','.join(uids),
             'command': 'Function',
-            'action': 'Vibrate:{}'.format(strength),
+            'action': action,
             'timeSec': duration,
         }}
         with requests.post(API_URL_COMMAND, json=req, timeout=5) as response:
