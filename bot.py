@@ -5,7 +5,7 @@ import time
 
 import requests
 from aiohttp import web
-from discord import Client, Intents, Embed
+from discord import Client, Intents, Embed, Game
 from discord_slash import SlashCommand, SlashContext, SlashCommandOptionType
 from discord_slash.utils.manage_commands import create_option
 
@@ -25,6 +25,15 @@ CALLBACK_PORT = 8000
 
 bot = Client(intents=Intents.default())
 slash = SlashCommand(bot, sync_commands=True, debug_guild=os.getenv('DEBUG_GUILD_ID', None))
+
+
+async def update_activity():
+    while True:
+        if bot.is_ready():
+            toy_count = sum([len(controller.get_toys(str(x))) for x in GUILD_IDS])
+            playing = 'with ' + ('no toys' if toy_count == 0 else '1 toy' if toy_count == 1 else '{} toys'.format(toy_count))
+            await bot.change_presence(activity=Game(name=playing))
+        await asyncio.sleep(60)
 
 
 @slash.subcommand(base='lovense', name="connect",
@@ -292,4 +301,5 @@ class Callbacks:
 controller = ToyController()
 callbacks = Callbacks(bot, controller)
 bot.loop.create_task(callbacks.webserver())
+bot.loop.create_task(update_activity())
 bot.run(TOKEN)
