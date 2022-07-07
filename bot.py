@@ -28,11 +28,12 @@ slash = SlashCommand(bot, sync_commands=True, debug_guild=os.getenv('DEBUG_GUILD
 
 
 async def update_activity():
+    if not bot.is_ready():
+        await bot.wait_until_ready()
     while True:
-        if bot.is_ready():
-            toy_count = sum([len(controller.get_toys(str(x))) for x in GUILD_IDS])
-            playing = 'with ' + ('no toys' if toy_count == 0 else '1 toy' if toy_count == 1 else '{} toys'.format(toy_count))
-            await bot.change_presence(activity=Game(name=playing))
+        toy_count = sum([len(controller.get_toys(str(x))) for x in GUILD_IDS])
+        playing = 'with ' + ('no toys' if toy_count == 0 else '1 toy' if toy_count == 1 else '{} toys'.format(toy_count))
+        await bot.change_presence(activity=Game(name=playing))
         await asyncio.sleep(60)
 
 
