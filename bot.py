@@ -3,6 +3,7 @@ import json
 import os
 import time
 
+import logging
 import requests
 from aiohttp import web
 from discord import Client, Intents, Embed, Game
@@ -25,15 +26,21 @@ CALLBACK_PORT = 8000
 
 bot = Client(intents=Intents.default())
 slash = SlashCommand(bot, sync_commands=True, debug_guild=os.getenv('DEBUG_GUILD_ID', None))
+logging.basicConfig(format='[%(asctime)s] [%(name)s] [%(levelname)s] - %(message)s', level=logging.INFO, filename='ToyBot.log')
+log = logging.getLogger('ToyBot')
 
 
 async def update_activity():
     if not bot.is_ready():
         await bot.wait_until_ready()
+    toy_count = 0
     while True:
+        last_count = toy_count
         toy_count = sum([len(controller.get_toys(str(x))) for x in GUILD_IDS])
-        playing = 'with ' + ('no toys' if toy_count == 0 else '1 toy' if toy_count == 1 else '{} toys'.format(toy_count))
-        await bot.change_presence(activity=Game(name=playing))
+        if toy_count != last_count:
+            playing = 'with ' + ('no toys' if toy_count == 0 else '1 toy' if toy_count == 1 else '{} toys'.format(toy_count))
+            log.info("Toy count is now {}, was {}. Updating presence.".format(toy_count, last_count))
+            await bot.change_presence(activity=Game(name=playing))
         await asyncio.sleep(60)
 
 
@@ -192,10 +199,10 @@ class ToyController:
 
     def add_user(self, guild_id: str, uid: str, user):
         if guild_id not in self.guilds:
-            print("Adding new guild with GID {}".format(guild_id))
+            log.info("Adding new guild with GID {}".format(guild_id))
             self.guilds[guild_id] = {}
         if uid not in self.guilds.get(guild_id):
-            print("Added new user with GID:UID {}:{}".format(guild_id, uid))
+            log.info("Added new user with GID:UID {}:{}".format(guild_id, uid))
         user['last_updated'] = round(time.time())
         self.guilds[guild_id][uid] = user
         self._save()
