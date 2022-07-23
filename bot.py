@@ -225,8 +225,9 @@ class ToyController:
             return False
         if uid is not None and uid not in self.guilds.get(guild_id):
             return False
+        uids = [x.get('uid') for x in (self.guilds.get(guild_id).values() if uid is None else [self.guilds.get(guild_id).get(uid)])]
         req = {**self.BASE_REQ, **{
-            'uid': ','.join(self.guilds.get(guild_id).keys() if uid is None else [guild_id + ':' + uid]),
+            'uid': ','.join(uids),
             'command': 'Preset',
             'name': pattern,
             'timeSec': 0,
@@ -252,7 +253,7 @@ class ToyController:
             return False
         if strength > 0:
             action += ':{}'.format(strength)
-        uids = ['{}:{}'.format(guild_id, x) for x in (self.guilds.get(guild_id).keys() if uid is None else [uid])]
+        uids = [x.get('uid') for x in (self.guilds.get(guild_id).values() if uid is None else [self.guilds.get(guild_id).get(uid)])]
         req = {**self.BASE_REQ, **{
             'uid': ','.join(uids),
             'command': 'Function',
